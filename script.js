@@ -3,30 +3,14 @@ document.getElementsByName("setTodaysDate")[0].setAttribute("min", today);
 
 const dropzones = document.querySelectorAll(".dropzone");
 
-const postTodos = async (data) => {
-  try {
-    const response = await fetch("http://localhost:3000/todos/", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(data),
-    });
-    return response.json();
-  } catch (error) {
-    console.log("Erro ao salvar");
+const Storage = {
+  get() {
+    return JSON.parse(localStorage.getItem("todos")) || [];
+  },
+  set(todos) {
+    localStorage.setItem("todos", JSON.stringify(todos));
   }
 };
-
-function putTodos(data) {
-  fetch(`http://localhost:3000/todos/${data.id}`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-}
-
-function deleteTodos(id) {
-  fetch(`http://localhost:3000/todos/${id}`, { method: "DELETE" });
-}
 
 const Modal = {
   open() {
@@ -50,7 +34,7 @@ const manipuladorInterface = {
         <div class="ohno">
           <div>${dados.responsible} - ${formatedDate(dados.date)}</div>
           <div>${dados.title}</div>
-          <div>${dados.description}</div>
+          <div>${dados.description || ""}</div>
         </div>
         <button type="button" class="buttonClose" onclick="closeButton('${dados.id}')">
           <i class="fas fa-times"></i>
@@ -68,32 +52,35 @@ const manipuladorInterface = {
 
   removeCard(id) {
     document.getElementById(id)?.remove();
-  },
+  }
 };
 
 function closeButton(id) {
-  deleteTodos(id);
+  Todo.todos = Todo.todos.filter(task => task.id !== id);
+  Storage.set(Todo.todos);
   manipuladorInterface.removeCard(id);
   contadorTarefas();
 }
 
 const App = {
   init() {
-    fetch("http://localhost:3000/todos/")
-      .then((response) => response.json())
-      .then((data) => {
-        Todo.todos = data;
-        data.forEach((item) => manipuladorInterface.addCard(item));
-        contadorTarefas();
-      });
-  },
+    Todo.todos = Storage.get();
+    Todo.todos.forEach(task => manipuladorInterface.addCard(task));
+    contadorTarefas();
+  }
 };
 
 const Todo = {
   todos: [],
+
   add(task) {
-    postTodos(task);
+    this.todos.push(task);
+    Storage.set(this.todos);
   },
+
+  update() {
+    Storage.set(this.todos);
+  }
 };
 
 const newTask = {
@@ -107,7 +94,7 @@ const newTask = {
       responsible: this.responsible.value,
       date: this.date.value,
       title: this.title.value,
-      description: this.description.value,
+      description: this.description.value
     };
   },
 
@@ -137,15 +124,16 @@ const newTask = {
 
     Todo.add(data);
     manipuladorInterface.addCard(data);
+
     Modal.close();
     this.clearFields();
     contadorTarefas();
-  },
+  }
 };
 
 function formatedDate(dt) {
   const data = new Date(dt);
-  return `${data.getDate()}/${data.getMonth()+1}/${data.getFullYear()}`;
+  return `${data.getDate()}/${data.getMonth() + 1}/${data.getFullYear()}`;
 }
 
 function dragStart() {
@@ -165,18 +153,18 @@ function dragEnd(e) {
   if (destino === "andamento") Todo.todos[index].status = 1;
   if (destino === "feito") Todo.todos[index].status = 2;
 
-  putTodos(Todo.todos[index]);
+  Todo.update();
   contadorTarefas();
 }
 
 dropzones.forEach(dropzone => {
-  dropzone.addEventListener("dragover", function() {
+  dropzone.addEventListener("dragover", function () {
     this.classList.add("over");
     const card = document.querySelector(".is-dragging");
     if (card) this.appendChild(card);
   });
 
-  dropzone.addEventListener("dragleave", function() {
+  dropzone.addEventListener("dragleave", function () {
     this.classList.remove("over");
   });
 });
