@@ -1,5 +1,5 @@
 const today = new Date().toISOString().split("T")[0];
-document.getElementsByName("setTodaysDate")[0].setAttribute("min", today);
+document.getElementsByName("setTodaysDate")[0]?.setAttribute("min", today);
 
 const dropzones = document.querySelectorAll(".dropzone");
 
@@ -18,7 +18,7 @@ const Modal = {
   },
   close() {
     document.querySelector(".modal-overlay").classList.remove("active");
-  },
+  }
 };
 
 const manipuladorInterface = {
@@ -29,19 +29,28 @@ const manipuladorInterface = {
   addCard(dados) {
     const card = document.createElement("div");
 
+    card.id = dados.id;
+    card.className = "card";
+    card.draggable = true;
+
     card.innerHTML = `
-      <div id="${dados.id}" class="card" draggable="true">
-        <div class="ohno">
-          <div>${dados.responsible} - ${formatedDate(dados.date)}</div>
-          <div>${dados.title}</div>
-          <div>${dados.description || ""}</div>
-        </div>
-        <button type="button" class="buttonClose" onclick="closeButton('${dados.id}')">
-          <i class="fas fa-times"></i>
-        </button>
+      <div class="cardContent">
+        <div>${dados.responsible} - ${formatedDate(dados.date)}</div>
+        <div><strong>${dados.title}</strong></div>
+        <div>${dados.description || ""}</div>
       </div>
+
+      <button type="button" class="buttonClose">
+        ✕
+      </button>
     `;
 
+    // evento fechar
+    card.querySelector(".buttonClose").addEventListener("click", () => {
+      closeButton(dados.id);
+    });
+
+    // drag events
     card.addEventListener("dragstart", dragStart);
     card.addEventListener("dragend", dragEnd);
 
@@ -52,6 +61,15 @@ const manipuladorInterface = {
 
   removeCard(id) {
     document.getElementById(id)?.remove();
+  },
+
+  clearBoards() {
+    dropzones.forEach(zone => zone.innerHTML = "");
+  },
+
+  renderTodos() {
+    this.clearBoards();
+    Todo.todos.forEach(task => this.addCard(task));
   }
 };
 
@@ -59,14 +77,12 @@ function closeButton(id) {
   Todo.todos = Todo.todos.filter(task => task.id !== id);
   Storage.set(Todo.todos);
   manipuladorInterface.removeCard(id);
-  contadorTarefas();
 }
 
 const App = {
   init() {
     Todo.todos = Storage.get();
-    Todo.todos.forEach(task => manipuladorInterface.addCard(task));
-    contadorTarefas();
+    manipuladorInterface.renderTodos();
   }
 };
 
@@ -127,7 +143,6 @@ const newTask = {
 
     Modal.close();
     this.clearFields();
-    contadorTarefas();
   }
 };
 
@@ -136,37 +151,54 @@ function formatedDate(dt) {
   return `${data.getDate()}/${data.getMonth() + 1}/${data.getFullYear()}`;
 }
 
+/* DRAG */
+
 function dragStart() {
-  dropzones.forEach(d => d.classList.add("highlight"));
   this.classList.add("is-dragging");
 }
 
-function dragEnd(e) {
-  dropzones.forEach(d => d.classList.remove("highlight"));
+function dragEnd() {
   this.classList.remove("is-dragging");
-
-  const cardID = e.target.id;
-  const destino = e.target.parentElement.id;
-  const index = Todo.todos.findIndex(x => x.id === cardID);
-
-  if (destino === "pendente") Todo.todos[index].status = 0;
-  if (destino === "andamento") Todo.todos[index].status = 1;
-  if (destino === "feito") Todo.todos[index].status = 2;
-
-  Todo.update();
-  contadorTarefas();
 }
 
+/* DROP */
+
 dropzones.forEach(dropzone => {
-  dropzone.addEventListener("dragover", function () {
+
+  dropzone.addEventListener("dragover", function (e) {
+    e.preventDefault();
     this.classList.add("over");
+
     const card = document.querySelector(".is-dragging");
-    if (card) this.appendChild(card);
+    if (card && this !== card.parentElement) {
+      this.appendChild(card);
+    }
   });
 
   dropzone.addEventListener("dragleave", function () {
     this.classList.remove("over");
   });
+
+  dropzone.addEventListener("drop", function () {
+    this.classList.remove("over");
+
+    const card = document.querySelector(".is-dragging");
+    if (!card) return;
+
+    const cardID = card.id;
+    const destino = this.id;
+
+    const index = Todo.todos.findIndex(x => x.id === cardID);
+
+    if (index === -1) return;
+
+    if (destino === "pendente") Todo.todos[index].status = 0;
+    if (destino === "andamento") Todo.todos[index].status = 1;
+    if (destino === "feito") Todo.todos[index].status = 2;
+
+    Todo.update();
+  });
+
 });
 
 App.init();
